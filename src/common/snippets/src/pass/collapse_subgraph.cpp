@@ -170,7 +170,8 @@ auto update_out_tensor_name(std::shared_ptr<ngraph::snippets::op::Subgraph> &sub
 } // namespace
 
 bool AppropriateForSubgraph(const std::shared_ptr<const Node> &node) {
-    return is_layout_oblivious(node) && has_supported_in_out(node);
+    // TODO: modify general methods
+    return (is_layout_oblivious(node) && has_supported_in_out(node)) || (ov::is_type<opset8::Gather>(node));
 }
 
 void SetSnippetsNodeType(const std::shared_ptr<Node> &node, SnippetsNodeType nodeType) {

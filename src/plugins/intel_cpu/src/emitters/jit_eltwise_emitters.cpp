@@ -17,6 +17,44 @@ using namespace Xbyak;
 namespace ov {
 namespace intel_cpu {
 
+jit_gather_emitter::jit_gather_emitter(jit_generator* host,
+                                 cpu_isa_t host_isa,
+                                 const std::shared_ptr<ngraph::Node>& node,
+                                 Precision exec_prc)
+    : jit_emitter(host, host_isa, node, exec_prc) {}
+jit_gather_emitter::jit_gather_emitter(jit_generator* host, cpu_isa_t host_isa, Precision exec_prc)
+    : jit_emitter(host, host_isa, exec_prc) {}
+
+size_t jit_gather_emitter::get_inputs_num() const {
+    return 3;
+}
+
+void jit_gather_emitter::emit_impl(const std::vector<size_t>& in_vec_idxs,
+                                const std::vector<size_t>& out_vec_idxs,
+                                const std::vector<size_t>& pool_vec_idxs,
+                                const std::vector<size_t>& pool_gpr_idxs,
+                                const emitter_context* emit_context) const {
+    if (host_isa_ == cpu::x64::avx2) {
+        emit_isa<cpu::x64::avx2>(in_vec_idxs, out_vec_idxs);
+    } else if (host_isa_ == cpu::x64::avx512_common) {
+        emit_isa<cpu::x64::avx512_common>(in_vec_idxs, out_vec_idxs);
+    } else if (host_isa_ == cpu::x64::sse41) {
+        IE_THROW() << "Gather instruction is not supported by SSE";
+    } else {
+        assert(!"unsupported isa");
+    }
+}
+
+template <dnnl::impl::cpu::x64::cpu_isa_t isa>
+void jit_gather_emitter::emit_isa(const std::vector<size_t>& in_vec_idxs, const std::vector<size_t>& out_vec_idxs) const {
+    using Vmm = typename conditional3<isa == cpu::x64::sse41, Xmm, isa == cpu::x64::avx2, Ymm, Zmm>::type;
+    Vmm vmm_src0 = Vmm(in_vec_idxs[0]);
+    Vmm vmm_src1 = Vmm(in_vec_idxs[1]);
+    Vmm vmm_dst = Vmm(out_vec_idxs[0]);
+
+    h->uni_vmovups(vmm_dst, vmm_src0);
+}
+
 /// ADD ///
 jit_add_emitter::jit_add_emitter(jit_generator *host, cpu_isa_t host_isa, const std::shared_ptr<ngraph::Node>& node, Precision exec_prc)
 : jit_emitter(host, host_isa, node, exec_prc) {}

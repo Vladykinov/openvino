@@ -15,6 +15,7 @@
 #include "jit_dnnl_ext_emitters.hpp"
 
 #include <ngraph/opsets/opset5.hpp>
+#include <ngraph/opsets/opset8.hpp>
 
 using namespace std;
 using namespace ngraph::snippets;
@@ -118,6 +119,9 @@ ov::intel_cpu::CPUTargetMachine::CPUTargetMachine(dnnl::impl::cpu::x64::cpu_isa_
 
     jitters[ngraph::snippets::op::Kernel::get_type_info_static()] = CREATE_EMITTER(KernelEmitter);
     jitters[ngraph::snippets::op::Tile::get_type_info_static()] = CREATE_EMITTER(TileEmitter);
+
+
+    jitters[ngraph::opset8::Gather::get_type_info_static()] = CREATE_EMITTER(ov::intel_cpu::jit_gather_emitter);
 }
 
 size_t ov::intel_cpu::CPUTargetMachine::get_lanes() const {
