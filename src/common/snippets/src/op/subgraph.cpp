@@ -154,27 +154,27 @@ Shape snippets::op::Subgraph::canonicalize(const BlockedShapeVector& outputShape
         const auto inRank = inShape.size();
         NODE_VALIDATION_CHECK(this, inRank <= baseRank, "Input rank can't be larger than output rank in snippets.");
         if (inRank < baseRank) {
-            Shape newShape(baseRank, 1);
-            // todo: more complicated logics is needed if we want to merge smth else than blocked and planar
-            // could be done by PartialShape::broadcast_merge_into, but this way is faster
-            size_t startOffset = baseRank - inRank;
-            if (baseIsBlocked) {
-                const bool inIsNotBlocked = inOrder.size() == std::set<size_t>(inOrder.begin(), inOrder.end()).size();
-                NODE_VALIDATION_CHECK(this, inIsNotBlocked, "Snippets don't support conversion between blocked layouts of different ranks");
-                startOffset--;
-            }
-            std::copy(inShape.begin(), inShape.end(), &newShape[startOffset]);
-            inShape = move(newShape);
-        } else {
-            // todo: 4d blocked + 5d planar layouts are not supported: <N, C, H, W, c> + <N, C, D, H, W>
-            NODE_VALIDATION_CHECK(this,
-                                  equal(baseOrder.begin(), baseOrder.end(), inOrder.begin()),
-                                  "Snippets canonicalization got input shapes of equal ranks but different layouts, which is not supported");
+        //    Shape newShape(baseRank, 1);
+        //    // todo: more complicated logics is needed if we want to merge smth else than blocked and planar
+        //    // could be done by PartialShape::broadcast_merge_into, but this way is faster
+        //    size_t startOffset = baseRank - inRank;
+        //    if (baseIsBlocked) {
+        //        const bool inIsNotBlocked = inOrder.size() == std::set<size_t>(inOrder.begin(), inOrder.end()).size();
+        //        NODE_VALIDATION_CHECK(this, inIsNotBlocked, "Snippets don't support conversion between blocked layouts of different ranks");
+        //        startOffset--;
+        //    }
+        //    std::copy(inShape.begin(), inShape.end(), &newShape[startOffset]);
+        //    inShape = move(newShape);
+        //} else {
+        //    // todo: 4d blocked + 5d planar layouts are not supported: <N, C, H, W, c> + <N, C, D, H, W>
+        //    NODE_VALIDATION_CHECK(this,
+        //                          equal(baseOrder.begin(), baseOrder.end(), inOrder.begin()),
+        //                          "Snippets canonicalization got input shapes of equal ranks but different layouts, which is not supported");
         }
-        ov::PartialShape tmpPShape(baseShape);
-        NODE_VALIDATION_CHECK(this,
-                              PartialShape::broadcast_merge_into(tmpPShape, inShape, ::ngraph::op::AutoBroadcastType::NUMPY),
-                              "Failed to create broadcastable shapes in snippets canonicalization");
+        //ov::PartialShape tmpPShape(baseShape);
+        //NODE_VALIDATION_CHECK(this,
+        //                      PartialShape::broadcast_merge_into(tmpPShape, inShape, ::ngraph::op::AutoBroadcastType::NUMPY),
+        //                      "Failed to create broadcastable shapes in snippets canonicalization");
         const auto paramShape = m_body->get_parameters()[i]->get_shape();
         if (paramShape.size() != inShape.size() || !equal(paramShape.begin(), paramShape.end(), inShape.begin()))
                 m_body->replace_parameter(i, std::make_shared<opset1::Parameter>(inType, inShape));
