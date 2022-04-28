@@ -21,6 +21,7 @@ namespace intel_cpu {
 struct jit_snippets_call_args {
     const void *src_ptrs[SNIPPETS_MAX_SNIPPETS_DIMS] = {};
     void *dst_ptrs[SNIPPETS_MAX_SNIPPETS_DIMS] = {};
+    void* memory_pool = nullptr;
 };
 
 struct jit_snippets_compile_args {

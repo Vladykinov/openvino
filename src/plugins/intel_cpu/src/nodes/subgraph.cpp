@@ -60,7 +60,8 @@ void Snippet::initSupportedPrimitiveDescriptors() {
     if (!supportedPrimitiveDescriptors.empty())
         return;
 
-    const Precision supportedPrecision = Precision::FP32;
+    const auto& inputPrecisions = getOriginalInputPrecisions();
+    const auto& outputPrecisions = getOriginalOutputPrecisions();
 
     bool dimRanksAreEqual = true;
     for (size_t i = 0; dimRanksAreEqual && i < inputShapes.size(); i++) {
@@ -132,7 +133,7 @@ void Snippet::initSupportedPrimitiveDescriptors() {
             if (inputShapes[i].getDims()[0] == 1) {
                 inputMask.reset(0); // accepts any stride on batch axis
             }
-            portConfig.setMemDesc(createMemoryDesc(inputShapes[i], supportedPrecision, offset), inputMask);
+            portConfig.setMemDesc(createMemoryDesc(inputShapes[i], inputPrecisions[i], offset), inputMask);
             config.inConfs[i] = portConfig;
         }
         config.outConfs.resize(outputShapes.size());
@@ -144,7 +145,7 @@ void Snippet::initSupportedPrimitiveDescriptors() {
             if (outputShapes[i].getDims()[0] == 1) {
                 outputMask.reset(0); // accepts any stride on batch axis
             }
-            portConfig.setMemDesc(createMemoryDesc(outputShapes[i], supportedPrecision, offset), outputMask);
+            portConfig.setMemDesc(createMemoryDesc(outputShapes[i], outputPrecisions[i], offset), outputMask);
             config.outConfs[i] = portConfig;
         }
 
@@ -438,16 +439,25 @@ void Snippet::generate() {
 }
 
 void Snippet::schedule_6d(const jit_snippets_call_args& call_args) const {
+    std::vector<float> memory_pool_vec(64 * parallel_get_num_threads());
+    float* memory_pool_ptr = memory_pool_vec.data();
     const auto& dom = exec_domain;
     // < N, C, H, W > < 1, 1, N, C*H*W>
     parallel_for5d(dom[0], dom[1], dom[2], dom[3], dom[4],
         [&](int64_t d0, int64_t d1, int64_t d2, int64_t d3, int64_t d4) {
+            auto cur_call_args = call_args;
+            auto ithr = parallel_get_thread_num();
+            cur_call_args.memory_pool = memory_pool_ptr + 64 * ithr;
+
             int64_t indexes[] = {d0, d1, d2, d3, d4};
-            schedule.get_callable<kernel>()(indexes, &call_args);
+            schedule.get_callable<kernel>()(indexes, &cur_call_args);
         });
 }
 
 void Snippet::schedule_nt(const jit_snippets_call_args& call_args) const {
+    std::vector<float> memory_pool_vec(64 * parallel_get_num_threads());
+    float* memory_pool_ptr = memory_pool_vec.data();
+
     const auto& work_size = exec_domain;
     parallel_nt(0, [&](const int ithr, const int nthr) {
         size_t start = 0, end = 0;
@@ -461,7 +471,11 @@ void Snippet::schedule_nt(const jit_snippets_call_args& call_args) const {
                 tmp /= work_size[j];
             }
 
-            schedule.get_callable<kernel>()(indexes.data(), &call_args);
+            auto cur_call_args = call_args;
+            auto ithr = parallel_get_thread_num();
+            cur_call_args.memory_pool = memory_pool_ptr + 64 * ithr;
+
+            schedule.get_callable<kernel>()(indexes.data(), &cur_call_args);
         }
     });
 }
