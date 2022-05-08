@@ -10,6 +10,8 @@
 #include "snippets/op/kernel.hpp"
 #include <snippets/itt.hpp>
 
+#include "ngraph/pass/serialize.hpp"
+
 #include <ngraph/pass/manager.hpp>
 
 auto ngraph::snippets::getRegisters(std::shared_ptr<ngraph::Node>& n) -> ngraph::snippets::RegInfo {
@@ -40,6 +42,8 @@ auto ngraph::snippets::getRegisters(std::shared_ptr<ngraph::Node>& n) -> ngraph:
 
 ngraph::snippets::code ngraph::snippets::Generator::generate(std::shared_ptr<ov::Model>& m,
                                                              const void* compile_params) const {
+    ngraph::pass::Serialize("C://models//subgraph.xml", "C://models//subgraph.bin").run_on_function(m);
+
     OV_ITT_SCOPED_TASK(ngraph::pass::itt::domains::SnippetsTransform, "Snippets::Generator::generate")
     if (!target->is_supported())
         throw ngraph_error("unsupported architecture for code genration");
@@ -54,6 +58,9 @@ ngraph::snippets::code ngraph::snippets::Generator::generate(std::shared_ptr<ov:
     // vector tile
     std::vector<std::pair<std::shared_ptr<ngraph::snippets::Emitter>, ngraph::snippets::RegInfo>> lowered;
     for (auto n : m->get_ordered_ops()) {
+        if (n->get_rt_info().count("TMP")) {
+            int k = 1;
+        }
         lowered.push_back(std::make_pair(target->get(n->get_type_info())(n), ngraph::snippets::getRegisters(n)));
     }
     OV_ITT_TASK_NEXT(GENERATE, "::ScalarTile")
@@ -67,27 +74,31 @@ ngraph::snippets::code ngraph::snippets::Generator::generate(std::shared_ptr<ov:
     OV_ITT_TASK_NEXT(GENERATE, "::ScalarTile_get")
     std::vector<std::pair<std::shared_ptr<Emitter>, RegInfo>> scalar_lowered;
     for (auto n : m_scalar->get_ordered_ops()) {
-        scalar_lowered.push_back(std::make_pair(target->get(n->get_type_info())(n), ngraph::snippets::getRegisters(n)));
+        scalar_lowered.push_back(
+            std::make_pair(target->get(n->get_type_info())(n), ngraph::snippets::getRegisters(n)));
     }
     OV_ITT_TASK_NEXT(GENERATE, "::Tiles1D")
 
     // wrapping into tiles1D
     std::vector<std::pair<std::shared_ptr<Emitter>, RegInfo>> tiles1D;
-    auto tile = std::make_shared<ngraph::snippets::op::Tile>(lowered);
-    tile->compile_params = compile_params;
-    tiles1D.push_back(std::make_pair(target->get(ngraph::snippets::op::Tile::get_type_info_static())(tile),
+    auto tile_lowered = std::make_shared<ngraph::snippets::op::Tile>(lowered);
+    tile_lowered->compile_params = compile_params;
+    tiles1D.push_back(
+        std::make_pair(target->get(ngraph::snippets::op::Tile::get_type_info_static())(tile_lowered),
                                    std::make_pair(std::vector<size_t>({target->get_lanes(), 0, nptrs, 1}), std::vector<size_t>{})));
-    tile = std::make_shared<ngraph::snippets::op::Tile>(scalar_lowered);
-    tile->compile_params = compile_params;
-    tiles1D.push_back(std::make_pair(target->get(ngraph::snippets::op::Tile::get_type_info_static())(tile),
+
+    auto tile_scalar_lowered = std::make_shared<ngraph::snippets::op::Tile>(scalar_lowered);
+    tile_scalar_lowered->compile_params = compile_params;
+    tiles1D.push_back(
+        std::make_pair(target->get(ngraph::snippets::op::Tile::get_type_info_static())(tile_scalar_lowered),
                     std::make_pair(std::vector<size_t>{{1, target->get_lanes(), nptrs, 1}}, std::vector<size_t>{})));
 
     OV_ITT_TASK_NEXT(GENERATE, "::Tiles2D")
     // wrapping into tiles2D
     std::vector<std::pair<std::shared_ptr<Emitter>, RegInfo>> tiles2D;
-    tile = std::make_shared<ngraph::snippets::op::Tile>(tiles1D);
-    tile->compile_params = compile_params;
-    tiles2D.push_back(std::make_pair(target->get(ngraph::snippets::op::Tile::get_type_info_static())(tile),
+    auto tile_2D = std::make_shared<ngraph::snippets::op::Tile>(tiles1D);
+    tile_2D->compile_params = compile_params;
+    tiles2D.push_back(std::make_pair(target->get(ngraph::snippets::op::Tile::get_type_info_static())(tile_2D),
                                      std::make_pair(std::vector<size_t>({1, 0, nptrs, 0}), std::vector<size_t>{})));
 
     OV_ITT_TASK_NEXT(GENERATE, "::EmitCode")

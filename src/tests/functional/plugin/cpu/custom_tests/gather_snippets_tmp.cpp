@@ -70,22 +70,24 @@ void GatherSnippetsTransformation::SetUp() {
                                                  _dilation,
                                                  ngraph::op::PadType::EXPLICIT,
                                                  _convOutChannels);
+    //auto conv = std::make_shared<ngraph::opset1::Clamp>(params[0], 0, 1);
 
     auto sum_const = ngraph::opset1::Constant::create(ngraph::element::f32, {1, 64, 1, 1}, {2.f});
     auto sum = std::make_shared<ngraph::opset1::Add>(conv, sum_const);
+    sum->set_friendly_name("TestSum");
 
     auto sum_const_2 = ngraph::opset1::Constant::create(ngraph::element::f32, {1, 64, 1, 1}, {3.f});
     auto sum_2 = std::make_shared<ngraph::opset1::Add>(conv, sum_const_2);
 
-    auto indices = ngraph::opset1::Constant::create(ngraph::element::i32, {2}, {2, 3});
+    auto indices = ngraph::opset1::Constant::create(ngraph::element::i32, {2}, {1, 2});
     auto axis = ngraph::opset1::Constant::create(ngraph::element::i32, {}, {1});
-    auto gather = std::make_shared<ngraph::opset8::Gather>(sum, indices, axis);
+    auto gather = std::make_shared<ngraph::opset8::Gather>(conv, indices, axis);
 
-    auto indices_2 = ngraph::opset1::Constant::create(ngraph::element::i32, {2}, {2, 3});
+    auto indices_2 = ngraph::opset1::Constant::create(ngraph::element::i32, {2}, {1, 2});
     auto axis_2 = ngraph::opset1::Constant::create(ngraph::element::i32, {}, {1});
-    auto gather_2 = std::make_shared<ngraph::opset8::Gather>(sum_2, indices_2, axis_2);
+    auto gather_2 = std::make_shared<ngraph::opset8::Gather>(conv, indices_2, axis_2);
 
-    auto mul = std::make_shared<ngraph::opset1::Multiply>(gather, gather_2);
+    auto mul = std::make_shared<ngraph::opset1::Multiply>(sum, sum_2);
 
     function = std::make_shared<ngraph::Function>(ngraph::OutputVector{mul}, "SnippetsTest");
 }
@@ -101,7 +103,7 @@ using namespace LayerTestsDefinitions;
 INSTANTIATE_TEST_SUITE_P(Custom_test,
                          GatherSnippetsTransformation,
                          ::testing::Combine(::testing::Values(ngraph::element::f32),
-                                            ::testing::Values(ngraph::PartialShape({1, 3, 16, 16})),
+                                            ::testing::Values(ngraph::PartialShape({1, 8, 8, 8})),
                                             ::testing::Values(CommonTestUtils::DEVICE_CPU),
                                             ::testing::Values(1)),
                          GatherSnippetsTransformation::getTestCaseName);

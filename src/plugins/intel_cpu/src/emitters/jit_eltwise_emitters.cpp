@@ -45,6 +45,17 @@ void jit_gather_emitter::emit_impl(const std::vector<size_t>& in_vec_idxs,
     }
 }
 
+//template <>
+//void jitUniGatherKernel<cpu::x64::avx2>::uniVpGatherDd(Vmm& vDst, const Xbyak::Address& srcAddr, Vmask& kMask) {
+//    vpgatherdd(vDst, srcAddr, kMask);
+//}
+//template <>
+//void jitUniGatherKernel<cpu::x64::avx512_common>::uniVpGatherDd(Vmm& vDst,
+//                                                                const Xbyak::Address& srcAddr,
+//                                                                Vmask& kMask) {
+//    vpgatherdd(vDst | kMask, srcAddr);
+//}
+
 template <dnnl::impl::cpu::x64::cpu_isa_t isa>
 void jit_gather_emitter::emit_isa(const std::vector<size_t>& in_vec_idxs, const std::vector<size_t>& out_vec_idxs) const {
     using Vmm = typename conditional3<isa == cpu::x64::sse41, Xmm, isa == cpu::x64::avx2, Ymm, Zmm>::type;
@@ -53,6 +64,8 @@ void jit_gather_emitter::emit_isa(const std::vector<size_t>& in_vec_idxs, const 
     Vmm vmm_dst = Vmm(out_vec_idxs[0]);
 
     h->uni_vmovups(vmm_dst, vmm_src0);
+    //h->vpgatherdd(vmm_src0, h->ptr[h->rsp + 0 * get_vec_length()]);
+    //h->vpgatherdd(vmm_src0, h->ptr[h->rsp], vmm_src1);
 }
 
 /// ADD ///

@@ -119,6 +119,8 @@
 #include "transformations/smart_reshape/smart_reshape.hpp"
 #include "ngraph_transformations/swap_convert_transpose.hpp"
 
+#include "ngraph/pass/serialize.hpp"
+
 #if !defined(__arm__) && !defined(_M_ARM) && !defined(__aarch64__) && !defined(_M_ARM64)
 #ifndef __GNUC_PREREQ
 #define __GNUC_PREREQ(major, minor) ((((__GNUC__) << 16) + (__GNUC_MINOR__)) >= (((major) << 16) + (minor)))
@@ -522,6 +524,8 @@ static void TransformationUpToCPUSpecificOpSet(std::shared_ptr<ngraph::Function>
 
     postLPTPassManager.register_pass<ngraph::pass::ConstantFolding>();
     postLPTPassManager.run_passes(nGraphFunc);
+    ngraph::pass::Serialize("C://models//test_before.xml", "C://models//test_before.bin").run_on_function(nGraphFunc);
+    ngraph::pass::VisualizeTree("C://models//test.before").run_on_function(nGraphFunc);
 
     if (!useLpt && _enableSnippets && dnnl::impl::cpu::x64::mayiuse(dnnl::impl::cpu::x64::avx2)) {
         ngraph::pass::Manager tokenization_manager;
@@ -550,6 +554,8 @@ static void TransformationUpToCPUSpecificOpSet(std::shared_ptr<ngraph::Function>
                 });
         tokenization_manager.run_passes(nGraphFunc);
     }
+    ngraph::pass::Serialize("C://models//test_after.xml", "C://models//test_after.bin").run_on_function(nGraphFunc);
+    ngraph::pass::VisualizeTree("C://models//test.after").run_on_function(nGraphFunc);
 }
 
 static void Transformation(CNNNetwork& clonedNetwork, const bool _enableLPT, const bool _enableSnippets, const bool isLegacyApi) {

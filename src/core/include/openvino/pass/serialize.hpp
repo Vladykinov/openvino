@@ -46,7 +46,7 @@ public:
               const std::string& binPath,
               std::map<std::string, ngraph::OpSet> custom_opsets,
               Version version = Version::UNSPECIFIED);
-    Serialize(const std::string& xmlPath, const std::string& binPath, Version version = Version::UNSPECIFIED);
+    Serialize(const std::string& xmlPath, const std::string& binPath = "", Version version = Version::UNSPECIFIED);
 
 private:
     std::ostream* m_xmlFile;

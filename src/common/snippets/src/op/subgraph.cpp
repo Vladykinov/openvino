@@ -223,6 +223,7 @@ void snippets::op::Subgraph::convert_to_snippet_dialect() {
     auto skip_matching_domain = [](const std::shared_ptr<const ov::Node>& n) -> bool {
         return n->get_input_shape(0).back() != 1;
     };
+
     ngraph::pass::Manager manager;
     manager.register_pass<snippets::pass::ConvertConstantsToScalars>();
     manager.register_pass<snippets::pass::ConvertPowerToPowerStatic>();
@@ -254,6 +255,24 @@ void snippets::op::Subgraph::convert_to_snippet_dialect() {
         set_callback<ngraph::snippets::pass::ReplaceStoresWithScalarStores>(skip_matching_domain);
     }
     manager.run_passes(m_body);
+
+    for (const auto& n : m_body->get_ordered_ops()) {
+        if (n->get_friendly_name() != "TestSum")
+            continue;
+
+        const auto new_add = n->clone_with_new_inputs(n->input_values());
+        const auto new_store = std::make_shared<ngraph::snippets::op::Store>(new_add);
+        const auto new_load = std::make_shared<ngraph::snippets::op::Load>(new_store);
+        new_store->set_friendly_name("new_store");
+        new_load->set_friendly_name("new_load");
+
+        new_store->get_rt_info()["TMP"] = "store";
+        new_load->get_rt_info()["TMP"] = "load";
+
+        replace_node(n, new_load);
+    }
+
+    ov::pass::Serialize("C://models//test.xml").run_on_function(m_body);
 }
 
 snippets::Schedule snippets::op::Subgraph::generate(const BlockedShapeVector& output_shapes,

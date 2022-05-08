@@ -152,6 +152,9 @@ bool ngraph::snippets::pass::AssignRegisters::run_on_model(const std::shared_ptr
         // store only effective address
         if (auto result = std::dynamic_pointer_cast<snippets::op::Store>(n)) {
             auto ea = reg64_tmp_start+static_cast<int64_t>(f->get_result_index(result) + f->get_parameters().size());
+            if (result->get_rt_info().count("TMP")) {
+                ea = static_cast<int64_t>(0);
+            }
             rt["effectiveAddress"] = ea;
             continue;
         }
@@ -167,7 +170,8 @@ bool ngraph::snippets::pass::AssignRegisters::run_on_model(const std::shared_ptr
                 rt["effectiveAddress"] = ea;
                 constantID++;
             } else {
-                throw ngraph_error("load/broadcast should follow only Parameter or non-Scalar constant");
+                rt["effectiveAddress"] = static_cast<int64_t>(0);
+                //throw ngraph_error("load/broadcast should follow only Parameter or non-Scalar constant");
             }
         }
 

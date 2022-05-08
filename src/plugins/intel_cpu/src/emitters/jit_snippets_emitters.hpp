@@ -468,10 +468,16 @@ private:
     void emit_isa(const std::vector<size_t> &in, const std::vector<size_t> &out) const {
         using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41,
                                     Xmm, isa == dnnl::impl::cpu::x64::avx2, Ymm, Zmm>::type;
-        Reg64 out_reg(ea);
+
         Vmm vmm_src0 = Vmm(in[0]);
-        h->uni_vmovups(h->ptr[out_reg], vmm_src0);
-        h->add(out_reg, dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen);
+        if (ea != 0) {
+            Reg64 out_reg(ea);
+            h->uni_vmovups(h->ptr[out_reg], vmm_src0);
+            h->add(out_reg, dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen);
+        } else {
+            Reg64 reg_const_params{dnnl::impl::cpu::x64::abi_param2};
+            h->mov(h->ptr[GET_OFF(memory_pool)], vmm_src0);
+        }
     }
 };
 
@@ -505,10 +511,15 @@ private:
     void emit_isa(const std::vector<size_t> &in, const std::vector<size_t> &out) const {
         using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41,
                                         Xmm, isa == dnnl::impl::cpu::x64::avx2, Ymm, Zmm>::type;
-        Reg64 out_reg(ea);
         Xmm vmm_src0 = Xmm(in[0]);
-        h->uni_vmovss(h->ptr[out_reg], vmm_src0);
-        h->add(out_reg, sizeof(float));
+        if (ea != 0) {
+            Reg64 out_reg(ea);
+            h->uni_vmovss(h->ptr[out_reg], vmm_src0);
+            h->add(out_reg, sizeof(float));
+        } else {
+            Reg64 reg_const_params{dnnl::impl::cpu::x64::abi_param2};
+            h->mov(h->ptr[GET_OFF(memory_pool)], vmm_src0);
+        }
     }
 };
 
@@ -542,12 +553,17 @@ private:
     void emit_isa(const std::vector<size_t> &in, const std::vector<size_t> &out) const {
         using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41,
                                             Xmm, isa == dnnl::impl::cpu::x64::avx2, Ymm, Zmm>::type;
-        Reg64 in_reg(ea);
         Vmm vmm_src0 = Vmm(out[0]);
-        h->uni_vmovups(vmm_src0, h->ptr[in_reg]);
+        if (ea != 0) {
+            Reg64 in_reg(ea);
+            h->uni_vmovups(vmm_src0, h->ptr[in_reg]);
 
-        if (shouldPostIncrement) {
-            h->add(in_reg, dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen);
+            if (shouldPostIncrement) {
+                h->add(in_reg, dnnl::impl::cpu::x64::cpu_isa_traits<isa>::vlen);
+            }
+        } else {
+            Reg64 reg_const_params{dnnl::impl::cpu::x64::abi_param2};
+            h->mov(vmm_src0, h->ptr[GET_OFF(memory_pool)]);
         }
     }
 
@@ -622,13 +638,18 @@ private:
     void emit_isa(const std::vector<size_t> &in, const std::vector<size_t> &out) const {
         using Vmm = typename dnnl::impl::utils::conditional3<isa == dnnl::impl::cpu::x64::sse41,
                                             Xmm, isa == dnnl::impl::cpu::x64::avx2, Ymm, Zmm>::type;
-        Reg64 in_reg(ea);
         Xmm vmm_src0 = Xmm(out[0]);
-        h->uni_vmovss(vmm_src0, h->ptr[in_reg]);
+        if (ea != 0) {
+            Reg64 in_reg(ea);
+            h->uni_vmovss(vmm_src0, h->ptr[in_reg]);
 
-        // Doesn't work if the same pointer comes with multiple load operations
-        if (shouldPostIncrement) {
-            h->add(in_reg, sizeof(float));
+            // Doesn't work if the same pointer comes with multiple load operations
+            if (shouldPostIncrement) {
+                h->add(in_reg, sizeof(float));
+            }
+        } else {
+            Reg64 reg_const_params{dnnl::impl::cpu::x64::abi_param2};
+            h->mov(vmm_src0, h->ptr[GET_OFF(memory_pool)]);
         }
     }
 
